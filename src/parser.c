@@ -77,6 +77,19 @@ Expression* parse_factor(Parser* parser) {
         expr->as.primary = value;
 
         return expr;
+    } else if (expect(parser, TOK_FLOATLITERAL)) {
+        Value value = {
+            .type = VAL_FLOAT,
+            .as.floating = strtod(current_token(parser)->span.data, NULL),
+        };
+
+        advance(parser);
+
+        Expression* expr = expression_make();
+        expr->type = EXPR_PRIMARY;
+        expr->as.primary = value;
+
+        return expr;
     } else if (expect(parser, TOK_IDENTIFIER)) {
         Token* id = current_token(parser);
         advance(parser);
@@ -131,7 +144,7 @@ Expression* parse_factor(Parser* parser) {
         } else {
             Value value = {
                 .type = VAL_IDENT,
-                .as.identifier = current_token(parser)->span,
+                .as.identifier = id->span,
             };
 
             Expression* expr = expression_make();
@@ -301,13 +314,7 @@ LetBlock parse_let_block(Parser* parser) {
 }
 
 Statement parse_statement(Parser* parser) {
-    if (expect(parser, TOK_LCBRACE)) {
-        Block* block = parse_block(parser);
-        return (Statement) {
-            .type = STMT_BLOCK,
-            .as.block = block,
-        };
-    } else if (expect(parser, TOK_LET)) {
+    if (expect(parser, TOK_LET)) {
         LetBlock letblock = parse_let_block(parser);
         return (Statement) {
             .type = STMT_LETBLOCK,

@@ -18,6 +18,7 @@ void function_call_free(FunctionCall* funcall);
 
 typedef enum {
     VAL_INT,
+    VAL_FLOAT,
     VAL_IDENT,
     VAL_FUNCALL,
 } ValueType;
@@ -27,6 +28,7 @@ typedef struct {
 
     union {
         int64_t integer;
+        double floating;
         Span identifier;
         FunctionCall funcall;
     } as;
@@ -96,7 +98,6 @@ Block* block_make();
 void block_free(Block* block);
 
 typedef enum {
-    STMT_BLOCK,
     STMT_LETBLOCK,
     STMT_EXPRESSION,
 } StatementType;
@@ -105,7 +106,6 @@ struct Statement_t {
     StatementType type;
 
     union {
-        Block* block;
         LetBlock letblock;
         Expression* expression;
     } as;

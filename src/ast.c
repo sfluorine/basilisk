@@ -101,9 +101,6 @@ void block_free(Block* block) {
 
 void statement_free(Statement* statement) {
     switch (statement->type) {
-        case STMT_BLOCK:
-            block_free(statement->as.block);
-            break;
         case STMT_LETBLOCK:
             let_block_free(&statement->as.letblock);
             break;

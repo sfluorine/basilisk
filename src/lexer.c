@@ -163,8 +163,28 @@ Token* lexer_lex(int* size) {
                 advance();
             } while (*s_source && isdigit(*s_source));
 
-            tokens_push(&tokens, token_make(start_line, start_col, TOK_INTLITERAL, span_make(start, len)));
-            tokens_size++;
+            if (*s_source == '.') {
+                len++;
+                advance();
+
+                int mantissa_len = 0;
+                do {
+                    mantissa_len++;
+                    advance();
+                } while (*s_source && isdigit(*s_source));
+
+                Span span = span_make(start, len + mantissa_len);
+
+                if (mantissa_len == 0) {
+                    error_and_die("invalid floating point number: "SPAN_FMT, SPAN_ARG(span));
+                }
+
+                tokens_push(&tokens, token_make(start_line, start_col, TOK_FLOATLITERAL, span));
+                tokens_size++;
+            } else {
+                tokens_push(&tokens, token_make(start_line, start_col, TOK_INTLITERAL, span_make(start, len)));
+                tokens_size++;
+            }
         } else if (isalpha(*s_source) || *s_source == '_') {
             int len = 0;
             do {

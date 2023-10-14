@@ -13,6 +13,8 @@ set(sources
     src/ast.c
     src/common.h
     src/common.c
+    src/interpreter.h
+    src/interpreter.c
     src/lexer.h
     src/lexer.c
     src/main.c
