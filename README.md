@@ -29,12 +29,12 @@ def dummy[x, y] -> {
     let [z] -> { # you can create new variables inside the square brackets.
         x -> x * x, # every assignment is separated by comma.
         y -> y * y,
-        z -> x + y,
+        z -> x + y
     }
 
     let [_] -> { # or if you don't want to create new variable, just add '_' inside the square brackets and you will be fine.
         x -> x * y, # every assignment is separated by comma.
-        y -> y * x,
+        y -> y * x
     }
 
     z
