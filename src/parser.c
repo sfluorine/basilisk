@@ -33,11 +33,28 @@ static void match(Parser* parser, TokenType type) {
         if (parser_eof(parser)) {
             error_and_die("unexpected end of file");
         } else {
-            error_and_die("unexpected token: "SPAN_FMT, SPAN_ARG(current_token(parser)->span));
+            error_and_die("expected: %d but got: ", type, SPAN_FMT, SPAN_ARG(current_token(parser)->span));
         }
     }
 
     advance(parser);
+}
+
+static bool expect_comparison(Parser* parser) {
+    if (!current_token(parser))
+        return false;
+
+    switch (current_token(parser)->type) {
+        case TOK_EQUALEQUAL:
+        case TOK_NOTEQUAL:
+        case TOK_GREATEREQUAL:
+        case TOK_LESSEQUAL:
+        case TOK_GREATER:
+        case TOK_LESS:
+            return true;
+        default:
+            return false;
+    }
 }
 
 void parser_init(Parser* parser, Token* tokens, int tokens_size) {
@@ -53,7 +70,7 @@ void parser_deinit(Parser* parser) {
     parser->cursor = 0;
 }
 
-Expression* parse_factor(Parser* parser) {
+Expression* parse_primary(Parser* parser) {
     if (parser_eof(parser)) {
         error_and_die("unexpected end of file");
     }
@@ -64,6 +81,8 @@ Expression* parse_factor(Parser* parser) {
         Expression* expr = parse_expression(parser);
 
         match(parser, TOK_RPAREN);
+
+        return expr;
     } else if (expect(parser, TOK_INTLITERAL)) {
         Value value = {
             .type = VAL_INT,
@@ -153,17 +172,35 @@ Expression* parse_factor(Parser* parser) {
 
             return expr;
         }
-
     }
 
     error_and_die("unexpected token: "SPAN_FMT, SPAN_ARG(current_token(parser)->span));
 }
 
-Expression* parse_term(Parser* parser) {
-    Expression* lhs = parse_factor(parser);
+Expression* parse_factor(Parser* parser) {
+    Expression* lhs = parse_primary(parser);
 
     while (expect(parser, TOK_STAR) || expect(parser, TOK_SLASH)) {
         BinaryExpressionType type = (current_token(parser)->type == TOK_STAR ? BIN_MUL : BIN_DIV);
+        advance(parser);
+
+        Expression* rhs = parse_primary(parser);
+
+        Expression* binary = expression_make();
+        binary->type = EXPR_BINARY;
+        binary->as.binary = binary_expression_make(type, lhs, rhs);
+
+        lhs = binary;
+    }
+
+    return lhs;
+}
+
+Expression* parse_term(Parser* parser) {
+    Expression* lhs = parse_factor(parser);
+
+    while (expect(parser, TOK_PLUS) || expect(parser, TOK_MINUS)) {
+        BinaryExpressionType type = (current_token(parser)->type == TOK_PLUS ? BIN_ADD : BIN_SUB);
         advance(parser);
 
         Expression* rhs = parse_factor(parser);
@@ -181,8 +218,38 @@ Expression* parse_term(Parser* parser) {
 Expression* parse_expression(Parser* parser) {
     Expression* lhs = parse_term(parser);
 
-    while (expect(parser, TOK_PLUS) || expect(parser, TOK_MINUS)) {
-        BinaryExpressionType type = (current_token(parser)->type == TOK_PLUS ? BIN_ADD : BIN_SUB);
+    while (expect_comparison(parser)) {
+        BinaryExpressionType type;
+
+        switch (current_token(parser)->type) {
+            case TOK_EQUALEQUAL:
+                type = BIN_EQU;
+                break;
+            case TOK_NOTEQUAL:
+                type = BIN_NEQU;
+                break;
+            case TOK_GREATEREQUAL:
+                type = BIN_GTEQ;
+                break;
+            case TOK_LESSEQUAL:
+                type = BIN_LTEQ;
+                break;
+            case TOK_GREATER:
+                type = BIN_GT;
+                break;
+            case TOK_LESS:
+                type = BIN_LT;
+                break;
+            case TOK_ANDAND:
+                type = BIN_AND;
+                break;
+            case TOK_BARBAR:
+                type = BIN_OR;
+                break;
+            default:
+                break;
+        }
+
         advance(parser);
 
         Expression* rhs = parse_term(parser);
@@ -313,12 +380,36 @@ LetBlock parse_let_block(Parser* parser) {
     };
 }
 
+IfStatement parse_if_statement(Parser* parser) {
+    match(parser, TOK_IF);
+
+    Expression* expr = parse_expression(parser);
+
+    Block* true_block = parse_block(parser);
+
+    match(parser, TOK_ELSE);
+
+    Block* false_block = parse_block(parser);
+
+    return (IfStatement) {
+        .expr = expr,
+        .true_block = true_block,
+        .false_block = false_block,
+    };
+}
+
 Statement parse_statement(Parser* parser) {
     if (expect(parser, TOK_LET)) {
         LetBlock letblock = parse_let_block(parser);
         return (Statement) {
             .type = STMT_LETBLOCK,
             .as.letblock = letblock,
+        };
+    } else if (expect(parser, TOK_IF)) {
+        IfStatement ifstatement = parse_if_statement(parser);
+        return (Statement) {
+            .type = STMT_IF,
+            .as.ifstatement = ifstatement,
         };
     } else {
         Expression* expression = parse_expression(parser);

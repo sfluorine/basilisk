@@ -33,11 +33,20 @@ typedef struct {
         FunctionCall funcall;
     } as;
 } Value;
+
 typedef enum {
     BIN_ADD,
     BIN_SUB,
     BIN_MUL,
     BIN_DIV,
+    BIN_EQU,
+    BIN_NEQU,
+    BIN_GT,
+    BIN_LT,
+    BIN_GTEQ,
+    BIN_LTEQ,
+    BIN_AND,
+    BIN_OR,
 } BinaryExpressionType;
 
 typedef struct {
@@ -97,8 +106,18 @@ typedef struct Block_t {
 Block* block_make();
 void block_free(Block* block);
 
+typedef struct {
+    Expression* expr;
+
+    Block* true_block;
+    Block* false_block;
+} IfStatement;
+
+void if_statement_free(IfStatement* ifstatement);
+
 typedef enum {
     STMT_LETBLOCK,
+    STMT_IF,
     STMT_EXPRESSION,
 } StatementType;
 
@@ -107,6 +126,7 @@ struct Statement_t {
 
     union {
         LetBlock letblock;
+        IfStatement ifstatement;
         Expression* expression;
     } as;
 };

@@ -121,8 +121,28 @@ Token* lexer_lex(int* size) {
                 continue;
             case '=':
                 advance();
-                tokens_push(&tokens, token_make(start_line, start_col, TOK_EQUAL, span_make(start, 1)));
-                tokens_size++;
+
+                if (*s_source == '=') {
+                    advance();
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_EQUALEQUAL, span_make(start, 1)));
+                    tokens_size++;
+                } else {
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_EQUAL, span_make(start, 1)));
+                    tokens_size++;
+                }
+                continue;
+            case '!':
+                advance();
+
+                if (*s_source == '=') {
+                    advance();
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_NOTEQUAL, span_make(start, 1)));
+                    tokens_size++;
+                } else {
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_BANG, span_make(start, 1)));
+                    tokens_size++;
+                }
+
                 continue;
             case '+':
                 advance();
@@ -151,6 +171,54 @@ Token* lexer_lex(int* size) {
                 advance();
                 tokens_push(&tokens, token_make(start_line, start_col, TOK_SLASH, span_make(start, 1)));
                 tokens_size++;
+                continue;
+            case '<':
+                advance();
+                if (*s_source == '=') {
+                    advance();
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_LESSEQUAL, span_make(start, 2)));
+                    tokens_size++;
+                } else {
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_LESS, span_make(start, 2)));
+                    tokens_size++;
+                }
+                continue;
+            case '>':
+                advance();
+
+                if (*s_source == '=') {
+                    advance();
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_GREATEREQUAL, span_make(start, 2)));
+                    tokens_size++;
+                } else {
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_GREATER, span_make(start, 2)));
+                    tokens_size++;
+                }
+
+                continue;
+            case '&':
+                advance(); 
+
+                if (*s_source == '&') {
+                    advance();
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_ANDAND, span_make(start, 2)));
+                    tokens_size++;
+                } else {
+                    error_and_die("invalid token: &");
+                }
+
+                continue;
+            case '|':
+                advance(); 
+
+                if (*s_source == '|') {
+                    advance();
+                    tokens_push(&tokens, token_make(start_line, start_col, TOK_BARBAR, span_make(start, 2)));
+                    tokens_size++;
+                } else {
+                    error_and_die("invalid token: |");
+                }
+
                 continue;
             default:
                 break;
@@ -199,6 +267,12 @@ Token* lexer_lex(int* size) {
                 tokens_size++;
             } else if (span_equals(span, span_from_cstr("let"))) {
                 tokens_push(&tokens, token_make(start_line, start_col, TOK_LET, span_make(start, len)));
+                tokens_size++;
+            } else if (span_equals(span, span_from_cstr("if"))) {
+                tokens_push(&tokens, token_make(start_line, start_col, TOK_IF, span_make(start, len)));
+                tokens_size++;
+            } else if (span_equals(span, span_from_cstr("else"))) {
+                tokens_push(&tokens, token_make(start_line, start_col, TOK_ELSE, span_make(start, len)));
                 tokens_size++;
             } else {
                 tokens_push(&tokens, token_make(start_line, start_col, TOK_IDENTIFIER, span_make(start, len)));

@@ -20,7 +20,27 @@
             double right = rhs.as.floating;\
             return (Object) {\
                 .type = lhs.type,\
-                .as.floating= left op right,\
+                .as.floating = left op right,\
+            };\
+        }\
+    }\
+
+#define PERFORM_BOOLBINOP(op) \
+    switch (lhs.type) { \
+        case OBJ_INT: {\
+            int64_t left = lhs.as.integer;\
+            int64_t right = rhs.as.integer;\
+            return (Object) {\
+                .type = OBJ_INT,\
+                .as.integer = left op right,\
+            };\
+        }\
+        case OBJ_FLOAT: {\
+            double left = lhs.as.floating;\
+            double right = rhs.as.floating;\
+            return (Object) {\
+                .type = OBJ_INT,\
+                .as.integer = left op right,\
             };\
         }\
     }\
@@ -86,12 +106,20 @@ static Object execute_binary(Interpreter* interpreter, BinaryExpression* binary,
             Object lhs = execute_expression(interpreter, binary->lhs, scope);
             Object rhs = execute_expression(interpreter, binary->rhs, scope);
 
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
             PERFORM_BINOP(+);
             break;
         }
         case BIN_SUB: {
             Object lhs = execute_expression(interpreter, binary->lhs, scope);
             Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
 
             PERFORM_BINOP(-);
             break;
@@ -100,6 +128,10 @@ static Object execute_binary(Interpreter* interpreter, BinaryExpression* binary,
             Object lhs = execute_expression(interpreter, binary->lhs, scope);
             Object rhs = execute_expression(interpreter, binary->rhs, scope);
 
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
             PERFORM_BINOP(*);
             break;
         }
@@ -107,7 +139,77 @@ static Object execute_binary(Interpreter* interpreter, BinaryExpression* binary,
             Object lhs = execute_expression(interpreter, binary->lhs, scope);
             Object rhs = execute_expression(interpreter, binary->rhs, scope);
 
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
             PERFORM_BINOP(/);
+            break;
+        }
+        case BIN_EQU: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(==);
+            break;
+        }
+        case BIN_NEQU: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(!=);
+            break;
+        }
+        case BIN_GT: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(>);
+            break;
+        }
+        case BIN_LT: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(<);
+            break;
+        }
+        case BIN_GTEQ: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(>=);
+            break;
+        }
+        case BIN_LTEQ: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(<=);
             break;
         }
     }
@@ -115,7 +217,6 @@ static Object execute_binary(Interpreter* interpreter, BinaryExpression* binary,
 
 Scope* scope_make() {
     Scope* scope = malloc(sizeof(Scope));
-    scope->parent = NULL;
 
     scope->children = NULL;
     scope->children_size = 0;
@@ -144,8 +245,6 @@ void scope_free(Scope* scope) {
 void scope_append_child(Scope* scope, Scope* child) {
     assert(scope != NULL);
     assert(child != NULL);
-
-    child->parent = scope;
 
     if (!scope->children) {
         scope->children_cap = 1;
@@ -241,13 +340,22 @@ void execute_let_block(Interpreter* interpreter, LetBlock* letblock, Scope* scop
     }
 }
 
-Object execute_block(Interpreter* interpreter, Block* block, Scope* scope) {
-    if (block->children_size < 1) {
-        error_and_die("any function is expected to return something");
+Object execute_if_statement(Interpreter* interpreter, IfStatement* ifstatement, Scope* scope) {
+    Object expr = execute_expression(interpreter, ifstatement->expr, scope);
+    if (expr.type != OBJ_INT) {
+        error_and_die("if expressions should be boolean");
     }
 
-    if (block->children[block->children_size - 1].type != STMT_EXPRESSION) {
-        error_and_die("expected return value");
+    if (expr.as.integer) {
+        return execute_block(interpreter, ifstatement->true_block, scope);
+    } else {
+        return execute_block(interpreter, ifstatement->false_block, scope);
+    }
+}
+ 
+Object execute_block(Interpreter* interpreter, Block* block, Scope* scope) {
+    if (block->children_size < 1) {
+        error_and_die("expected expressions");
     }
 
     for (int i = 0; i < block->children_size - 1; i++) {
@@ -257,14 +365,22 @@ Object execute_block(Interpreter* interpreter, Block* block, Scope* scope) {
             case STMT_LETBLOCK:
                 execute_let_block(interpreter, &statement->as.letblock, scope);
                 break;
-            case STMT_EXPRESSION: {
-                (void) execute_expression(interpreter, statement->as.expression, scope);
+            case STMT_IF:
+                return execute_if_statement(interpreter, &statement->as.ifstatement, scope);
                 break;
-            }
+            case STMT_EXPRESSION:
+                return execute_expression(interpreter, statement->as.expression, scope);
+                break;
         }
     }
 
-    return execute_expression(interpreter, block->children[block->children_size - 1].as.expression, scope);
+    if (block->children[block->children_size - 1].type == STMT_EXPRESSION) {
+        return execute_expression(interpreter, block->children[block->children_size - 1].as.expression, scope);
+    } else if (block->children[block->children_size - 1].type == STMT_IF) {
+        return execute_if_statement(interpreter, &block->children[block->children_size - 1].as.ifstatement, scope);
+    } else {
+        error_and_die("any block is expected to return something");
+    }
 }
 
 Object execute_function_declaration(Interpreter* interpreter, FunctionDeclaration* fundecl, Scope* scope) {

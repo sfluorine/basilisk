@@ -9,6 +9,8 @@ typedef enum {
 
     TOK_DEF,
     TOK_LET,
+    TOK_IF,
+    TOK_ELSE,
 
     TOK_LPAREN,
     TOK_RPAREN,
@@ -18,13 +20,24 @@ typedef enum {
     TOK_RCBRACE,
     TOK_COMMA,
     TOK_EQUAL,
+    TOK_BANG,
+
+    TOK_ANDAND, // &&
+    TOK_BARBAR, // ||
+
+    TOK_ARROW,
+    TOK_EQUALEQUAL,
+    TOK_NOTEQUAL,
+    TOK_GREATEREQUAL,
+    TOK_LESSEQUAL,
+    TOK_GREATER,
+    TOK_LESS,
 
     TOK_PLUS,
     TOK_MINUS,
     TOK_STAR,
     TOK_SLASH,
 
-    TOK_ARROW
 } TokenType;
 
 typedef struct {

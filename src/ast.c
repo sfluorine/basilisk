@@ -99,10 +99,20 @@ void block_free(Block* block) {
     free(block);
 }
 
+void if_statement_free(IfStatement* ifstatement) {
+    expression_free(ifstatement->expr);
+
+    block_free(ifstatement->true_block);
+    block_free(ifstatement->false_block);
+}
+
 void statement_free(Statement* statement) {
     switch (statement->type) {
         case STMT_LETBLOCK:
             let_block_free(&statement->as.letblock);
+            break;
+        case STMT_IF:
+            if_statement_free(&statement->as.ifstatement);
             break;
         case STMT_EXPRESSION:
             expression_free(statement->as.expression);

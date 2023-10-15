@@ -22,8 +22,6 @@ typedef struct {
 } Variable;
 
 typedef struct Scope_t {
-    struct Scope_t* parent;
-
     struct Scope_t** children;
     int children_size;
     int children_cap;
@@ -52,6 +50,7 @@ FunctionDeclaration* interpreter_find_fundecl(Interpreter* interpreter, Span id)
 Object execute_expression(Interpreter* interpreter, Expression* expression, Scope* scope);
 void execute_assignment(Interpreter* interpreter, Assignment* assignment, Scope* scope);
 void execute_let_block(Interpreter* interpreter, LetBlock* letblock, Scope* scope);
+Object execute_if_statement(Interpreter* interpreter, IfStatement* ifstatement, Scope* scope);
 Object execute_block(Interpreter* interpreter, Block* block, Scope* scope);
 Object execute_function_declaration(Interpreter* interpreter, FunctionDeclaration* fundecl, Scope* scope);
 Object execute_module(Interpreter* interpreter);
