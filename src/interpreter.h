@@ -2,9 +2,23 @@
 
 #include "ast.h"
 
+typedef struct Interpreter_t Interpreter;
+typedef struct Scope_t Scope;
+
+typedef void (*NativeFunction)(Interpreter* interpreter, Scope* scope);
+
+typedef struct {
+    NativeFunction fun;
+
+    Expression* args;
+    int args_size;
+    int args_cap;
+} Native;
+
 typedef enum {
     OBJ_INT,
     OBJ_FLOAT,
+    OBJ_VOID,
 } ObjectType;
 
 typedef struct {
@@ -21,15 +35,15 @@ typedef struct {
     Object object;
 } Variable;
 
-typedef struct Scope_t {
-    struct Scope_t** children;
+struct Scope_t {
+    Scope** children;
     int children_size;
     int children_cap;
 
     Variable* variables;
     int variables_size;
     int variables_cap;
-} Scope;
+};
 
 Scope* scope_make();
 void scope_free(Scope* scope);
@@ -38,9 +52,9 @@ void scope_append_child(Scope* scope, Scope* child);
 void scope_append_variable(Scope* scope, Variable variable);
 Variable* scope_find_variable(Scope* scope, Span id);
 
-typedef struct {
+struct Interpreter_t {
     Module* module;
-} Interpreter;
+};
 
 void interpreter_init(Interpreter* interpreter, Module* module);
 void interpreter_deinit(Interpreter* interpreter);

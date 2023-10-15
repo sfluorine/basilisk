@@ -5,6 +5,25 @@
 #include "common.h"
 #include "interpreter.h"
 
+/* native functions are defined here */
+static void basilisk_print(Interpreter* interpreter, Scope* scope) {
+    Variable* arg0 = scope_find_variable(scope, span_from_cstr("arg0"));
+    if (!arg0) {
+        error_and_die("scope is not set correctly");
+    }
+
+    switch (arg0->object.type) {
+        case OBJ_INT:
+            printf("%ld\n", arg0->object.as.integer);
+            break;
+        case OBJ_FLOAT:
+            printf("%.*f\n", 15, arg0->object.as.floating);
+            break;
+        case OBJ_VOID:
+            error_and_die("cannot print void value");
+    }
+}
+
 #define PERFORM_BINOP(op) \
     switch (lhs.type) { \
         case OBJ_INT: {\
@@ -22,6 +41,9 @@
                 .type = lhs.type,\
                 .as.floating = left op right,\
             };\
+        }\
+        case OBJ_VOID: {\
+            error_and_die("void types doesn't support any binary operator");\
         }\
     }\
 
@@ -43,34 +65,60 @@
                 .as.integer = left op right,\
             };\
         }\
+        case OBJ_VOID: {\
+            error_and_die("void types doesn't support any binary operator");\
+        }\
     }\
 
 static Object execute_funcall(Interpreter* interpreter, FunctionCall* funcall, Scope* parent_scope) {
-    FunctionDeclaration* fun = interpreter_find_fundecl(interpreter, funcall->id);
-    if (!fun) {
-        error_and_die("no such function: "SPAN_FMT, SPAN_ARG(funcall->id));
-    }
+    if (span_equals(funcall->id, span_from_cstr("print"))) {
+        if (funcall->args_size != 1) {
+            error_and_die("print expected: %d arguments but got: %d", 1, funcall->args_size);
+        }
 
-    if (funcall->args_size != fun->args_size) {
-        error_and_die(SPAN_FMT" expected: %d arguments but got: %d", SPAN_ARG(fun->id), fun->args_size, funcall->args_size);
-    }
+        Scope* scope = scope_make();
 
-    Scope* scope = scope_make();
-
-    for (int i = 0; i < fun->args_size; i++) {
-        Object object = execute_expression(interpreter, funcall->args[i], parent_scope);
+        Object object = execute_expression(interpreter, funcall->args[0], parent_scope);
 
         scope_append_variable(scope, (Variable) {
-            .id = fun->args[i],
+            .id = span_from_cstr("arg0"),
             .object = object,
         });
+
+        basilisk_print(interpreter, scope);
+
+        scope_free(scope);
+
+        return (Object) {
+            .type = OBJ_VOID,
+        };
+    } else {
+        FunctionDeclaration* fun = interpreter_find_fundecl(interpreter, funcall->id);
+        if (!fun) {
+            error_and_die("no such function: "SPAN_FMT, SPAN_ARG(funcall->id));
+        }
+
+        if (funcall->args_size != fun->args_size) {
+            error_and_die(SPAN_FMT" expected: %d arguments but got: %d", SPAN_ARG(fun->id), fun->args_size, funcall->args_size);
+        }
+
+        Scope* scope = scope_make();
+
+        for (int i = 0; i < fun->args_size; i++) {
+            Object object = execute_expression(interpreter, funcall->args[i], parent_scope);
+
+            scope_append_variable(scope, (Variable) {
+                .id = fun->args[i],
+                .object = object,
+            });
+        }
+
+        Object result = execute_function_declaration(interpreter, fun, scope);
+
+        scope_free(scope);
+
+        return result;
     }
-
-    Object result = execute_function_declaration(interpreter, fun, scope);
-
-    scope_free(scope);
-
-    return result;
 }
 
 static Object execute_primary(Interpreter* interpreter, Value* value, Scope* scope) {
@@ -97,6 +145,8 @@ static Object execute_primary(Interpreter* interpreter, Value* value, Scope* sco
             return execute_funcall(interpreter, &value->as.funcall, scope);
             break;
         }
+        default:
+            error_and_die("unreachable");
     }
 }
 
@@ -212,7 +262,31 @@ static Object execute_binary(Interpreter* interpreter, BinaryExpression* binary,
             PERFORM_BOOLBINOP(<=);
             break;
         }
+        case BIN_AND: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(&&);
+            break;
+        }
+        case BIN_OR: {
+            Object lhs = execute_expression(interpreter, binary->lhs, scope);
+            Object rhs = execute_expression(interpreter, binary->rhs, scope);
+
+            if (lhs.type != rhs.type) {
+                error_and_die("mismatched types for binary operator\n    lhs: %d\n    rhs: %d", lhs.type, rhs.type);
+            }
+
+            PERFORM_BOOLBINOP(||);
+            break;
+        }
     }
+
+    error_and_die("unreachable");
 }
 
 Scope* scope_make() {
@@ -315,8 +389,9 @@ Object execute_expression(Interpreter* interpreter, Expression* expression, Scop
             return execute_primary(interpreter, &expression->as.primary, scope);
         case EXPR_BINARY:
             return execute_binary(interpreter, &expression->as.binary, scope);
-            break;
     }
+
+    error_and_die("unreachable");
 }
 
 void execute_assignment(Interpreter* interpreter, Assignment* assignment, Scope* scope) {
@@ -366,10 +441,10 @@ Object execute_block(Interpreter* interpreter, Block* block, Scope* scope) {
                 execute_let_block(interpreter, &statement->as.letblock, scope);
                 break;
             case STMT_IF:
-                return execute_if_statement(interpreter, &statement->as.ifstatement, scope);
+                (void) execute_if_statement(interpreter, &statement->as.ifstatement, scope);
                 break;
             case STMT_EXPRESSION:
-                return execute_expression(interpreter, statement->as.expression, scope);
+                (void) execute_expression(interpreter, statement->as.expression, scope);
                 break;
         }
     }

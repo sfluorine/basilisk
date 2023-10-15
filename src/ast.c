@@ -5,6 +5,8 @@
 #include "common.h"
 
 void function_call_free(FunctionCall* funcall) {
+    assert(funcall != NULL);
+
     if (funcall->args) {
         for (int i = 0; i < funcall->args_size; i++) {
             expression_free(funcall->args[i]);
@@ -61,7 +63,11 @@ void assignment_free(Assignment* assignment) {
 }
 
 void let_block_free(LetBlock* letblock) {
-    free(letblock->ids);
+    assert(letblock != NULL);
+
+    if (letblock->ids) {
+        free(letblock->ids);
+    }
 
     if (letblock->assignments) {
         for (int i = 0; i < letblock->assignments_size; i++) {
@@ -100,6 +106,8 @@ void block_free(Block* block) {
 }
 
 void if_statement_free(IfStatement* ifstatement) {
+    assert(ifstatement != NULL);
+
     expression_free(ifstatement->expr);
 
     block_free(ifstatement->true_block);
@@ -107,6 +115,8 @@ void if_statement_free(IfStatement* ifstatement) {
 }
 
 void statement_free(Statement* statement) {
+    assert(statement != NULL);
+
     switch (statement->type) {
         case STMT_LETBLOCK:
             let_block_free(&statement->as.letblock);
@@ -131,6 +141,8 @@ void function_declaration_free(FunctionDeclaration* fundecl) {
 }
 
 void module_free(Module* module) {
+    assert(module != NULL);
+
     if (module->fundecls) {
         for (int i = 0; i < module->fundecls_size; i++) {
             function_declaration_free(&module->fundecls[i]);

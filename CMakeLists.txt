@@ -5,6 +5,7 @@ project(
     VERSION 1.0
     LANGUAGES C)
 
+
 set(target
     basilisk)
 
@@ -25,6 +26,8 @@ set(sources
     src/token.h
     src/token.c
     )
+
+set(CMAKE_C_FLAGS "-Wall -Wextra")
 
 add_executable(
     ${target}

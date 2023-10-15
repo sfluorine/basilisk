@@ -72,8 +72,17 @@ Token* lexer_lex(int* size) {
     tokens_init(&tokens);
 
     while (*s_source) {
-        while (*s_source && isspace(*s_source))
-            advance();
+        while (*s_source && (isspace(*s_source) || *s_source == '#')) {
+            while (*s_source && isspace(*s_source)) {
+                advance();
+            }
+
+            if (*s_source && *s_source == '#') {
+                do {
+                    advance();
+                } while (*s_source && *s_source != '\n');
+            }
+        }
 
         const char* start = s_source;
         int start_line = s_line;
@@ -149,10 +158,39 @@ Token* lexer_lex(int* size) {
                 tokens_push(&tokens, token_make(start_line, start_col, TOK_PLUS, span_make(start, 1)));
                 tokens_size++;
                 continue;
-            case '-':
+            case '-': {
                 advance();
 
-                if (*s_source == '>') {
+                if (isdigit(*s_source)) {
+                    int len = 0;
+                    do {
+                        len++;
+                        advance();
+                    } while (*s_source && isdigit(*s_source));
+
+                    if (*s_source == '.') {
+                        len++;
+                        advance();
+
+                        int mantissa_len = 0;
+                        do {
+                            mantissa_len++;
+                            advance();
+                        } while (*s_source && isdigit(*s_source));
+
+                        Span span = span_make(start, len + mantissa_len);
+
+                        if (mantissa_len == 0) {
+                            error_and_die("invalid floating point number: "SPAN_FMT, SPAN_ARG(span));
+                        }
+
+                        tokens_push(&tokens, token_make(start_line, start_col, TOK_FLOATLITERAL, span));
+                        tokens_size++;
+                    } else {
+                        tokens_push(&tokens, token_make(start_line, start_col, TOK_INTLITERAL, span_make(start, len)));
+                        tokens_size++;
+                    }
+                } else if (*s_source == '>') {
                     advance();
                     tokens_push(&tokens, token_make(start_line, start_col, TOK_ARROW, span_make(start, 2)));
                     tokens_size++;
@@ -162,6 +200,7 @@ Token* lexer_lex(int* size) {
                 }
 
                 continue;
+            }
             case '*':
                 advance();
                 tokens_push(&tokens, token_make(start_line, start_col, TOK_STAR, span_make(start, 1)));
