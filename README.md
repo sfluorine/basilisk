@@ -2,8 +2,6 @@
 
 IDC what u said, just build the project and try the language.
 
-NOTE: module only accepts function declarations for now.
-
 ## Basic Syntax
 
 
@@ -38,5 +36,25 @@ def dummy[x, y] -> {
     }
 
     z
+}
+```
+
+### Records
+
+You can create records for compound types
+
+```python
+record Tree {
+    lhs,
+    rhs
+}
+
+def make_tree[lhs, rhs] -> {
+    record Tree { lhs, rhs } # this is the syntax for record creation.
+}
+
+def main[] -> {
+    print[make_tree[34, make_tree[35, 36]]]
+    0
 }
 ```
