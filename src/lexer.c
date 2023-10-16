@@ -235,6 +235,7 @@ Token* lexer_lex(int* size) {
                 }
 
                 continue;
+
             case '&':
                 advance(); 
 
@@ -258,6 +259,11 @@ Token* lexer_lex(int* size) {
                     error_and_die("invalid token: |");
                 }
 
+                continue;
+            case '.':
+                advance();
+                tokens_push(&tokens, token_make(start_line, start_col, TOK_DOT, span_make(start, 1)));
+                tokens_size++;
                 continue;
             default:
                 break;
@@ -301,7 +307,10 @@ Token* lexer_lex(int* size) {
 
             Span span = span_make(start, len);
 
-            if (span_equals(span, span_from_cstr("def"))) {
+            if(span_equals(span, span_from_cstr("record"))) {
+                tokens_push(&tokens, token_make(start_line, start_col, TOK_RECORD, span_make(start, len)));
+                tokens_size++;
+            } else if (span_equals(span, span_from_cstr("def"))) {
                 tokens_push(&tokens, token_make(start_line, start_col, TOK_DEF, span_make(start, len)));
                 tokens_size++;
             } else if (span_equals(span, span_from_cstr("let"))) {
@@ -318,7 +327,6 @@ Token* lexer_lex(int* size) {
                 tokens_size++;
             }
         } else {
-
             int len = 0;
             do {
                 len++;

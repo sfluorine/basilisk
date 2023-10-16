@@ -16,11 +16,22 @@ typedef struct {
 
 void function_call_free(FunctionCall* funcall);
 
+typedef struct {
+    Span id;
+
+    Expression** args;
+    int args_size;
+    int args_cap;
+} RecordCreation;
+
+void record_creation_free(RecordCreation* record_creation);
+
 typedef enum {
     VAL_INT,
     VAL_FLOAT,
     VAL_IDENT,
     VAL_FUNCALL,
+    VAL_RECORD_CREATION,
 } ValueType;
 
 typedef struct {
@@ -31,6 +42,7 @@ typedef struct {
         double floating;
         Span identifier;
         FunctionCall funcall;
+        RecordCreation record_creation;
     } as;
 } Value;
 
@@ -146,6 +158,20 @@ typedef struct {
 void function_declaration_free(FunctionDeclaration* fundecl);
 
 typedef struct {
+    Span id;
+
+    Span* fields;
+    int fields_size;
+    int fields_cap;
+} Record;
+
+void record_free(Record* record);
+
+typedef struct {
+    Record* records;
+    int records_size;
+    int records_cap;
+
     FunctionDeclaration* fundecls;
     int fundecls_size;
     int fundecls_cap;

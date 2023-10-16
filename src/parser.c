@@ -172,6 +172,17 @@ Expression* parse_primary(Parser* parser) {
 
             return expr;
         }
+    } else {
+        RecordCreation record_creation = parse_record_creation(parser);
+
+        Expression* expr = expression_make();
+        expr->type = EXPR_PRIMARY;
+        expr->as.primary = (Value) {
+            .type = VAL_RECORD_CREATION,
+            .as.record_creation = record_creation,
+        };
+
+        return expr;
     }
 
     error_and_die("unexpected token: "SPAN_FMT, SPAN_ARG(current_token(parser)->span));
@@ -469,26 +480,140 @@ FunctionDeclaration parse_function_declaration(Parser* parser) {
     };
 }
 
+Record parse_record(Parser* parser) {
+    match(parser, TOK_RECORD);
+
+    Token* id = current_token(parser);
+    match(parser, TOK_IDENTIFIER);
+
+    match(parser, TOK_LCBRACE);
+
+    Span* fields = NULL;
+    int fields_size = 0;
+    int fields_cap = 0;
+
+    bool first = true;
+    while (!parser_eof(parser) && !expect(parser, TOK_RCBRACE)) {
+        if (!first) {
+            match(parser, TOK_COMMA);
+        }
+
+        Token* field = current_token(parser);
+        match(parser, TOK_IDENTIFIER);
+
+        if (!fields) {
+            fields_cap = 1;
+            fields = malloc(sizeof(Span));
+        } else {
+            fields_cap++;
+            fields = realloc(fields, sizeof(Span) * fields_cap);
+        }
+
+        fields[fields_size++] = field->span;
+
+        first = false;
+    }
+
+    match(parser, TOK_RCBRACE);
+
+    if (fields_size == 0) {
+        error_and_die("record expects atleast 1 field");
+    }
+
+    return (Record) {
+        .id = id->span,
+        .fields = fields,
+        .fields_size = fields_size,
+        .fields_cap = fields_cap,
+    };
+}
+
+RecordCreation parse_record_creation(Parser* parser) {
+    match(parser, TOK_RECORD);
+
+    Token* id = current_token(parser);
+    match(parser, TOK_IDENTIFIER);
+
+    match(parser, TOK_LCBRACE);
+
+    Expression** args = NULL;
+    int args_size = 0;
+    int args_cap = 0;
+
+    bool first = true;
+    while (!parser_eof(parser) && !expect(parser, TOK_RCBRACE)) {
+        if (!first) {
+            match(parser, TOK_COMMA);
+        }
+
+        Expression* expression = parse_expression(parser);
+
+        if (!args) {
+            args_cap = 1;
+            args = malloc(sizeof(Expression*));
+        } else {
+            args_cap++;
+            args = realloc(args, sizeof(Expression*) * args_cap);
+        }
+
+        args[args_size++] = expression;
+
+        first = false;
+    }
+
+    match(parser, TOK_RCBRACE);
+
+    return (RecordCreation) {
+        .id = id->span,
+        .args = args,
+        .args_size = args_size,
+        .args_cap = args_cap,
+    };
+}
+
 Module parse_module(Parser* parser) {
+    Record* records = NULL;
+    int records_size = 0;
+    int records_cap = 0;
+
     FunctionDeclaration* fundecls = NULL;
     int fundecls_size = 0;
     int fundecls_cap = 0;
 
     while (!parser_eof(parser)) {
-        FunctionDeclaration fundecl = parse_function_declaration(parser);
+        if (expect(parser, TOK_RECORD)) {
+            Record record = parse_record(parser);
 
-        if (!fundecls) {
-            fundecls_cap = 1;
-            fundecls = malloc(sizeof(FunctionDeclaration));
+            if (!records) {
+                records_cap = 1;
+                records = malloc(sizeof(Record));
+            } else {
+                records_cap++;
+                records = realloc(records, sizeof(Record) * records_cap);
+            }
+
+            records[records_size++] = record;
+        } else if (expect(parser, TOK_DEF)) {
+            FunctionDeclaration fundecl = parse_function_declaration(parser);
+
+            if (!fundecls) {
+                fundecls_cap = 1;
+                fundecls = malloc(sizeof(FunctionDeclaration));
+            } else {
+                fundecls_cap++;
+                fundecls = realloc(fundecls, sizeof(FunctionDeclaration) * fundecls_cap);
+            }
+
+            fundecls[fundecls_size++] = fundecl;
         } else {
-            fundecls_cap++;
-            fundecls = realloc(fundecls, sizeof(FunctionDeclaration) * fundecls_cap);
+            error_and_die("expected top level declarations");
         }
-
-        fundecls[fundecls_size++] = fundecl;
     }
 
     return (Module) {
+        .records = records,
+        .records_size = records_size,
+        .records_cap = records_cap,
         .fundecls = fundecls,
         .fundecls_size = fundecls_size,
         .fundecls_cap = fundecls_cap,

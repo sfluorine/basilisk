@@ -7,6 +7,7 @@ typedef enum {
     TOK_FLOATLITERAL,
     TOK_IDENTIFIER,
 
+    TOK_RECORD,
     TOK_DEF,
     TOK_LET,
     TOK_IF,
@@ -21,6 +22,7 @@ typedef enum {
     TOK_COMMA,
     TOK_EQUAL,
     TOK_BANG,
+    TOK_DOT,
 
     TOK_ANDAND, // &&
     TOK_BARBAR, // ||
@@ -37,7 +39,6 @@ typedef enum {
     TOK_MINUS,
     TOK_STAR,
     TOK_SLASH,
-
 } TokenType;
 
 typedef struct {

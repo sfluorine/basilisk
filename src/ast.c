@@ -16,6 +16,18 @@ void function_call_free(FunctionCall* funcall) {
     }
 }
 
+void record_creation_free(RecordCreation* record_creation) {
+    assert(record_creation != NULL);
+
+    if (record_creation->args) {
+        for (int i = 0; i < record_creation->args_size; i++) {
+            expression_free(record_creation->args[i]);
+        }
+
+        free(record_creation->args);
+    }
+}
+
 BinaryExpression binary_expression_make(BinaryExpressionType type, Expression* lhs, Expression* rhs) {
     return (BinaryExpression) {
         .type = type,
@@ -43,8 +55,15 @@ void expression_free(Expression* expr) {
 
     switch (expr->type) {
         case EXPR_PRIMARY:
-            if (expr->as.primary.type == VAL_FUNCALL) {
-                function_call_free(&expr->as.primary.as.funcall);
+            switch (expr->as.primary.type) {
+                case VAL_FUNCALL:
+                    function_call_free(&expr->as.primary.as.funcall);
+                    break;
+                case VAL_RECORD_CREATION:
+                    record_creation_free(&expr->as.primary.as.record_creation);
+                    break;
+                default:
+                    break;
             }
 
             free(expr);
@@ -140,6 +159,14 @@ void function_declaration_free(FunctionDeclaration* fundecl) {
     block_free(fundecl->block);
 }
 
+void record_free(Record* record) {
+    assert(record != NULL);
+
+    if (record->fields) {
+        free(record->fields);
+    }
+}
+
 void module_free(Module* module) {
     assert(module != NULL);
 
@@ -149,5 +176,13 @@ void module_free(Module* module) {
         }
 
         free(module->fundecls);
+    }
+
+    if (module->records) {
+        for (int i = 0; i < module->records_size; i++) {
+            record_free(&module->records[i]);
+        }
+
+        free(module->records);
     }
 }

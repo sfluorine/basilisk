@@ -22,4 +22,6 @@ IfStatement parse_if_statement(Parser* parser);
 Block* parse_block(Parser* parser);
 Statement parse_statement(Parser* parser);
 FunctionDeclaration parse_function_declaration(Parser* parser);
+Record parse_record(Parser* parser);
+RecordCreation parse_record_creation(Parser* parser);
 Module parse_module(Parser* parser);

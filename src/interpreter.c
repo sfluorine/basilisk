@@ -5,6 +5,30 @@
 #include "common.h"
 #include "interpreter.h"
 
+static void object_print(Object* object) {
+    switch (object->type) {
+        case OBJ_INT:
+            printf("%ld ", object->as.integer);
+            break;
+        case OBJ_FLOAT:
+            printf("%.*f ", 15, object->as.floating);
+            break;
+        case OBJ_RECORD: {
+            ObjRecord* record = &object->as.record;
+
+            printf(SPAN_FMT" [ ", SPAN_ARG(record->id));
+            for (int i = 0; i < record->variables_size; i++) {
+                printf(""SPAN_FMT": ", SPAN_ARG(record->variables[i].id));
+                object_print(&record->variables[i].object);
+            }
+            printf("] ");
+            break;
+        }
+        case OBJ_VOID:
+            error_and_die("cannot print void value");
+    }
+}
+
 /* native functions are defined here */
 static void basilisk_print(Interpreter* interpreter, Scope* scope) {
     Variable* arg0 = scope_find_variable(scope, span_from_cstr("arg0"));
@@ -12,16 +36,8 @@ static void basilisk_print(Interpreter* interpreter, Scope* scope) {
         error_and_die("scope is not set correctly");
     }
 
-    switch (arg0->object.type) {
-        case OBJ_INT:
-            printf("%ld\n", arg0->object.as.integer);
-            break;
-        case OBJ_FLOAT:
-            printf("%.*f\n", 15, arg0->object.as.floating);
-            break;
-        case OBJ_VOID:
-            error_and_die("cannot print void value");
-    }
+    object_print(&arg0->object);
+    printf("\n");
 }
 
 #define PERFORM_BINOP(op) \
@@ -42,8 +58,8 @@ static void basilisk_print(Interpreter* interpreter, Scope* scope) {
                 .as.floating = left op right,\
             };\
         }\
-        case OBJ_VOID: {\
-            error_and_die("void types doesn't support any binary operator");\
+        default: {\
+            error_and_die("user defined types / void doesn't support any binary operator");\
         }\
     }\
 
@@ -65,8 +81,8 @@ static void basilisk_print(Interpreter* interpreter, Scope* scope) {
                 .as.integer = left op right,\
             };\
         }\
-        case OBJ_VOID: {\
-            error_and_die("void types doesn't support any binary operator");\
+        default: {\
+            error_and_die("user defined types / void doesn't support any binary operator");\
         }\
     }\
 
@@ -121,6 +137,46 @@ static Object execute_funcall(Interpreter* interpreter, FunctionCall* funcall, S
     }
 }
 
+static Object execute_record_creation(Interpreter* interpreter, RecordCreation* record_creation, Scope* scope) {
+    Record* record = interpreter_find_record(interpreter, record_creation->id);
+    if (!record) {
+        error_and_die("no such record: "SPAN_FMT, SPAN_ARG(record_creation->id));
+    }
+
+    if (record_creation->args_size != record->fields_size) {
+        error_and_die(SPAN_FMT" expected: %d arguments but got: %d", SPAN_ARG(record_creation->id), record->fields_size, record_creation->args_size);
+    }
+
+    Variable* variables = NULL;
+    int variables_size = 0;
+    int variables_cap = 0;
+
+    for (int i = 0; i < record_creation->args_size; i++) {
+        if (!variables) {
+            variables_cap = 1;
+            variables = malloc(sizeof(Variable));
+        } else {
+            variables_cap++;
+            variables = realloc(variables, sizeof(Variable) * variables_cap);
+        }
+
+        variables[variables_size++] = (Variable) {
+            .id = record->fields[i],
+            .object = execute_expression(interpreter, record_creation->args[i], scope),
+        };
+    }
+
+    return (Object) {
+        .type = OBJ_RECORD,
+        .as.record = (ObjRecord) {
+            .id = record->id,
+            .variables = variables,
+            .variables_size = variables_size,
+            .variables_cap = variables_cap,
+        },
+    };
+}
+
 static Object execute_primary(Interpreter* interpreter, Value* value, Scope* scope) {
     switch (value->type) {
         case VAL_INT:
@@ -143,6 +199,10 @@ static Object execute_primary(Interpreter* interpreter, Value* value, Scope* sco
             return variable->object;
         case VAL_FUNCALL:
             return execute_funcall(interpreter, &value->as.funcall, scope);
+            break;
+        }
+        case VAL_RECORD_CREATION: {
+            return execute_record_creation(interpreter, &value->as.record_creation, scope);
             break;
         }
         default:
@@ -289,6 +349,35 @@ static Object execute_binary(Interpreter* interpreter, BinaryExpression* binary,
     error_and_die("unreachable");
 }
 
+void obj_record_free(ObjRecord* objrecord) {
+    assert(objrecord != NULL);
+
+    if (objrecord->variables) {
+        for (int i = 0; i < objrecord->variables_size; i++) {
+            variable_free(&objrecord->variables[i]);
+        }
+    }
+}
+
+void object_free(Object* object) {
+    assert(object != NULL);
+
+    switch (object->type) {
+        case OBJ_RECORD: {
+            obj_record_free(&object->as.record);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void variable_free(Variable* variable) {
+    assert(variable != NULL);
+
+    object_free(&variable->object);
+}
+
 Scope* scope_make() {
     Scope* scope = malloc(sizeof(Scope));
 
@@ -312,7 +401,14 @@ void scope_free(Scope* scope) {
         free(scope->children);
     }
 
-    free(scope->variables);
+    if (scope->variables) {
+        for (int i = 0; i < scope->variables_size; i++) {
+            variable_free(&scope->variables[i]);
+        }
+
+        free(scope->variables);
+    }
+
     free(scope);
 }
 
@@ -357,6 +453,7 @@ Variable* scope_find_variable(Scope* scope, Span id) {
     return variable;
 }
 
+
 void interpreter_init(Interpreter* interpreter, Module* module) {
     assert(interpreter != NULL);
     assert(module != NULL);
@@ -381,6 +478,19 @@ FunctionDeclaration* interpreter_find_fundecl(Interpreter* interpreter, Span id)
     }
 
     return fundecl;
+}
+
+Record* interpreter_find_record(Interpreter* interpreter, Span id) {
+    Module* module = interpreter->module;
+
+    Record* record = NULL;
+    for (int i = 0; i < module->records_size; i++) {
+        if (span_equals(module->records[i].id, id)) {
+            record = &module->records[i];
+        }
+    }
+
+    return record;
 }
 
 Object execute_expression(Interpreter* interpreter, Expression* expression, Scope* scope) {
